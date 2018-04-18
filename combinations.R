@@ -18,6 +18,7 @@ df2 <- data.frame(df[order(df$a), ])
 df2$try <- "ns"
 df2$try <- ifelse(df2$b<df2$a, "no", 'yes')
 df3 <- subset(df2, try=='yes')
+df3$index <- 1:nrow(df3) ## add index for simulations 
 
 
 out <- c()
@@ -26,7 +27,8 @@ for(i in 1: nrow(df3)){
 
   PA.sub <- subset(PA, YEAR >= tmp$a & YEAR <= tmp$b  & YEAR !=2010)
 
-    if(nrow(PA.sub)>0){
+    #if(nrow(PA.sub)>0){
+      if(nrow(PA.sub)>=5){ #5 year minimum
         x <- melt(PA.sub, id="YEAR")
         colnames(x) <- c("Year", "State", "Landings")
         x2 <- group_by(x, State) %>%
@@ -62,9 +64,51 @@ LAout <- quantile(out3$LA, probs = c(.025, .25, .5, .75, .975))
 TXout <- quantile(out3$TX, probs = c(.025, .25, .5, .75, .975))
 
 quantileOut <- data.frame(FL=FLout, AL=ALout, MS=MSout, LA=LAout, TX=TXout)
-write.csv(quantileOut, "C:/dump/quantileOut.csv", row.names=FALSE)
+write.csv(quantileOut, "quantileOut.csv", row.names=FALSE)
 
 
 ### Calculate quantile of a number
 FLquantile <- ecdf(out3$FL)
 FLquantile(28)
+
+
+####################################### simulation test################### select 10 random years and compute 1000 times
+### use df3 from above
+
+PA.sim <- subset(PA, YEAR!=2010)
+PA.sim$index <- 1:nrow(PA.sim)
+
+out.sim <- c()
+
+for(i in 1:1000){
+  set.seed(i)
+    INDEX <- sample(PA.sim$index, size=10, replace = FALSE)  #select rows for subsetting
+    PA.sim2 <- subset(PA.sim, index %in% INDEX)
+    PA.sim2 <- select(PA.sim2, -index)
+    x <- melt(PA.sim2, id="YEAR")
+    colnames(x) <- c("Year", "State", "Landings")
+    x2 <- group_by(x, State) %>%
+          summarise(Landings=mean(Landings) )
+    x2$Allocation <- (x2$Landings/sum(x2$Landings))*100
+    x2$State <- c("FL", "AL", "MS", "LA", "TX")
+    x3 <-  select(x2, -Landings)
+    x4 <- spread(x3, State, Allocation)
+    x5 <- as.data.frame(x4)
+out.sim <- rbind(out.sim, x5)
+}
+
+FLout.sim <- quantile(out.sim$FL, probs = c(.025, .25, .5, .75, .975))
+ALout.sim <- quantile(out.sim$AL, probs = c(.025, .25, .5, .75, .975))
+MSout.sim <- quantile(out.sim$MS, probs = c(.025, .25, .5, .75, .975))
+LAout.sim <- quantile(out.sim$LA, probs = c(.025, .25, .5, .75, .975))
+TXout.sim <- quantile(out.sim$TX, probs = c(.025, .25, .5, .75, .975))
+
+quantileOut.sim <- data.frame(FL=FLout.sim, AL=ALout.sim, MS=MSout.sim, LA=LAout.sim, TX=TXout.sim)
+write.csv(quantileOut.sim, "quantileOut.sim.csv", row.names=FALSE)
+
+
+### Calculate quantile of a number
+FLquantile <- ecdf(out3$FL)
+FLquantile(28)
+
+save.image("combinations.RData")
